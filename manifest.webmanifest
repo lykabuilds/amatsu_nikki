@@ -1,0 +1,13 @@
+{
+  "name": "Amatsu Nikki",
+  "short_name": "Amatsu Nikki",
+  "description": "A gecko care diary: meals, weight, profile and health for leopard geckos.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f1ea",
+  "theme_color": "#e8742a",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
