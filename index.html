@@ -133,7 +133,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 form{display:grid;gap:10px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row3{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:10px}
-@media (max-width:400px){.row3{grid-template-columns:1fr 1fr}.row3 label:first-child{grid-column:1/-1}}
+.row3.eq{grid-template-columns:repeat(3,minmax(0,1fr))}
+.calc{display:block;font:500 15px var(--mono);font-variant-numeric:tabular-nums;color:var(--fg);background:var(--surface);border:1px dashed var(--line);border-radius:9px;padding:9px 10px}
+.calc.warn{color:var(--bad);border-color:var(--bad)}
+
 label{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500;min-width:0}
 input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 10px;width:100%;box-sizing:border-box;min-width:0}
 .chart{width:100%;height:auto;display:block}
@@ -270,14 +273,16 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
           <label>Date<input type="date" id="fDate" required></label>
           <label>Time<input type="time" id="fTime" required></label>
         </div>
-        <div class="row3">
-          <label>Insect<select id="fInsect">
-            <option>Crickets</option><option>Dubia roaches</option><option>Mealworms</option><option>Superworms</option>
-            <option>Black soldier fly larvae</option><option>Silkworms</option><option>Hornworms</option><option>Waxworms</option><option>Other</option>
-          </select></label>
-          <label>Ate<input type="number" id="fCount" min="0" max="99" step="1" value="5" required inputmode="numeric"></label>
-          <label>Refused<input type="number" id="fRefused" min="0" max="99" step="1" value="0" inputmode="numeric"></label>
+        <label>Insect<select id="fInsect">
+          <option>Crickets</option><option>Dubia roaches</option><option>Mealworms</option><option>Superworms</option>
+          <option>Black soldier fly larvae</option><option>Silkworms</option><option>Hornworms</option><option>Waxworms</option><option>Other</option>
+        </select></label>
+        <div class="row3 eq">
+          <label>Put in dish<input type="number" id="fOffered" min="0" max="99" step="1" value="6" required inputmode="numeric"></label>
+          <label>Ate<input type="number" id="fCount" min="0" max="99" step="1" value="6" required inputmode="numeric"></label>
+          <label>Refused<output id="fRefusedOut" class="calc" for="fOffered fCount">0</output></label>
         </div>
+        <p class="note" id="fHint" style="margin:0">Refused is worked out for you: put in dish minus ate.</p>
         <label>Notes (optional)<input id="fNotes" maxlength="120" placeholder="e.g. Dusted with calcium, in shed"></label>
         <button class="btn" type="submit">Save meal</button>
       </form>
@@ -523,7 +528,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
       const d=document.createElement('span');d.className='date';d.textContent=fmt(it.date);
       const w=document.createElement('div');w.className='what';
       const s=document.createElement('strong');const sb=document.createElement('span');
-      if(it.k==='f'){s.textContent=`${it.count} × ${it.insect}`;sb.textContent=[fmtTime(it.time),+it.refused?`refused ${it.refused}`:'',it.notes].filter(Boolean).join(' · ')}
+      if(it.k==='f'){const off=it.offered!=null?+it.offered:(+it.count||0)+(+it.refused||0);s.textContent=`Ate ${it.count} of ${off} ${it.insect.toLowerCase()}`;sb.textContent=[fmtTime(it.time),+it.refused?`refused ${it.refused}`:'all eaten',it.notes].filter(Boolean).join(' · ')}
       else{s.textContent=`${it.grams} g`;const c=document.createElement('span');c.className='chip';c.textContent='Weigh-in';s.appendChild(c)}
       w.append(s);if(sb.textContent)w.append(sb);
       const x=document.createElement('button');x.type='button';const key=it.k+it.id;
@@ -597,10 +602,24 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
     const id=await add('geckos',{name,morph,...prof,createdAt:Date.now()});
     if(id){toast(`${name} added`);current=id;show('gecko')}
   };
+  const offeredVal=()=>Math.max(0,parseInt($('fOffered').value,10)||0);
+  const ateVal=()=>Math.max(0,parseInt($('fCount').value,10)||0);
+  let ateTouched=false;
+  function updateRefused(){
+    const o=offeredVal(),a=ateVal(),out=$('fRefusedOut'),bad=a>o;
+    out.textContent=bad?'—':String(o-a);out.classList.toggle('warn',bad);
+    $('fHint').textContent=bad?'Ate is higher than what you put in the dish. Check the numbers.':'Refused is worked out for you: put in dish minus ate.';
+    $('fHint').style.color=bad?'var(--bad)':'';
+  }
+  $('fOffered').addEventListener('input',()=>{if(!ateTouched)$('fCount').value=$('fOffered').value;updateRefused()});
+  $('fCount').addEventListener('input',()=>{ateTouched=true;updateRefused()});
+  $('feedForm').addEventListener('reset',()=>{ateTouched=false});
+  updateRefused();
   $('feedForm').onsubmit=async e=>{e.preventDefault();if(!current)return;
     const data={geckoId:current,date:$('fDate').value,time:$('fTime').value,insect:$('fInsect').value,
-      count:Math.max(0,parseInt($('fCount').value,10)||0),refused:Math.max(0,parseInt($('fRefused').value,10)||0),notes:$('fNotes').value.trim(),createdAt:Date.now()};
-    if(await add('feedings',data)){$('fNotes').value='';$('fRefused').value='0';toast('Meal saved')}
+      offered:offeredVal(),count:ateVal(),refused:Math.max(0,offeredVal()-ateVal()),notes:$('fNotes').value.trim(),createdAt:Date.now()};
+    if(data.count>data.offered){toast('Ate can’t be more than what you put in the dish');return}
+    if(await add('feedings',data)){$('fNotes').value='';ateTouched=false;$('fCount').value=$('fOffered').value;updateRefused();toast('Meal saved')}
   };
   $('weightForm').onsubmit=async e=>{e.preventDefault();if(!current)return;
     const grams=+parseFloat($('wGrams').value).toFixed(1);if(!(grams>0))return;
