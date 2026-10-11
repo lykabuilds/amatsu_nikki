@@ -135,6 +135,11 @@ form{display:grid;gap:10px}
 .row3{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:10px}
 .row3.eq{grid-template-columns:repeat(3,minmax(0,1fr))}
 .calc{display:block;font:500 15px var(--mono);font-variant-numeric:tabular-nums;color:var(--fg);background:var(--surface);border:1px dashed var(--line);border-radius:9px;padding:9px 10px}
+label.check{display:flex;flex-direction:row;gap:8px;align-items:center;font-size:14px;color:var(--fg);cursor:pointer}
+label.check input{width:18px;height:18px;padding:0;accent-color:var(--accent)}
+.editing{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.acts{display:flex;gap:0;align-items:center}
+.chip.wait{background:var(--watch-soft);color:var(--watch)}
 .calc.warn{color:var(--bad);border-color:var(--bad)}
 
 label{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500;min-width:0}
@@ -268,7 +273,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
 
     <div class="forms">
       <form class="panel" id="feedForm">
-        <h2>Log a meal</h2>
+        <h2 id="feedTitle">Log a meal</h2>
         <div class="row">
           <label>Date<input type="date" id="fDate" required></label>
           <label>Time<input type="time" id="fTime" required></label>
@@ -282,16 +287,17 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
           <label>Ate<input type="number" id="fCount" min="0" max="99" step="1" value="6" required inputmode="numeric"></label>
           <label>Refused<output id="fRefusedOut" class="calc" for="fOffered fCount">0</output></label>
         </div>
+        <label class="check"><input type="checkbox" id="fPending"> Still in the dish, I’ll update what was eaten later</label>
         <p class="note" id="fHint" style="margin:0">Refused is worked out for you: put in dish minus ate.</p>
         <label>Notes (optional)<input id="fNotes" maxlength="120" placeholder="e.g. Dusted with calcium, in shed"></label>
-        <button class="btn" type="submit">Save meal</button>
+        <div class="seg"><button class="btn" type="submit" id="feedSubmit">Save meal</button><button class="btn ghost" type="button" id="feedCancel" hidden>Cancel</button></div>
       </form>
 
       <form class="panel" id="weightForm">
-        <h2>Log weight</h2>
+        <h2 id="wTitle">Log weight</h2>
         <label>Date<input type="date" id="wDate" required></label>
         <label>Weight (grams)<input type="number" id="wGrams" min="1" max="200" step="0.1" required inputmode="decimal" placeholder="e.g. 52.5"></label>
-        <button class="btn" type="submit">Save weight</button>
+        <div class="seg"><button class="btn" type="submit" id="wSubmit">Save weight</button><button class="btn ghost" type="button" id="wCancel" hidden>Cancel</button></div>
         <p class="note" style="margin:0">Weigh at the same time of day, before feeding, for consistent numbers.</p>
       </form>
     </div>
@@ -380,7 +386,8 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
     }else checks.push({k:'weight',st:'none',t:W.length?'One weigh-in so far':'No weigh-ins yet',s:'Log weight every 1–2 weeks to see a trend.'});
 
     // 3. appetite
-    const recent=F.filter(f=>daysAgo(f.date)<14),earlier=F.filter(f=>daysAgo(f.date)>=14&&daysAgo(f.date)<42);
+    const done=F.filter(f=>!f.pending);
+    const recent=done.filter(f=>daysAgo(f.date)<14),earlier=done.filter(f=>daysAgo(f.date)>=14&&daysAgo(f.date)<42);
     const eaten=a=>a.reduce((s,f)=>s+(+f.count||0),0),refused=a=>a.reduce((s,f)=>s+(+f.refused||0),0);
     if(recent.length>=2){
       let st='good',parts=[];
@@ -405,6 +412,8 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
       else checks.push({k:'variety',st:'good',t:`${kinds.size} feeder types this month`,s:'Good variety.'});
     }
 
+    const waiting=F.filter(f=>f.pending&&daysAgo(f.date)>=1);
+    if(waiting.length)checks.push({k:'pending',st:'watch',t:`${waiting.length} meal${waiting.length>1?'s':''} waiting for an update`,s:`Insects put in the dish on ${fmt(waiting[waiting.length-1].date)} still need "Ate" filled in. Tap Update in History.`});
     const scored=checks.filter(c=>c.st!=='none');
     const overall=scored.length?scored.reduce((m,c)=>RANK[c.st]>RANK[m]?c.st:m,'good'):'none';
     const worst=[...checks].sort((a,b)=>RANK[b.st]-RANK[a.st])[0];
@@ -412,7 +421,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
   }
 
   /* ---------- Views ---------- */
-  function show(v){view=v;
+  function show(v){if(typeof stopEdit==='function')stopEdit(true);view=v;
     $('home').hidden=v!=='home';$('detail').hidden=v!=='gecko';$('geckoForm').hidden=v!=='form';
     pendingDel=null;render();window.scrollTo(0,0);
   }
@@ -506,7 +515,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
     $('hBasis').textContent=h.basis;
 
     // stats
-    if(F.length){$('sLast').textContent=ago(daysAgo(F[0].date));$('sLastSub').textContent=`${F[0].count} ${F[0].insect.toLowerCase()} · ${fmt(F[0].date)}`}
+    if(F.length){$('sLast').textContent=ago(daysAgo(F[0].date));$('sLastSub').textContent=F[0].pending?`${F[0].offered} ${F[0].insect.toLowerCase()} in dish · ${fmt(F[0].date)}`:`${F[0].count} ${F[0].insect.toLowerCase()} · ${fmt(F[0].date)}`}
     else{$('sLast').textContent='—';$('sLastSub').textContent='No meals logged'}
     const sub=$('sWeightSub');sub.className='';
     if(W.length){const l=W[W.length-1];$('sWeight').textContent=`${l.grams} g`;
@@ -528,14 +537,20 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
       const d=document.createElement('span');d.className='date';d.textContent=fmt(it.date);
       const w=document.createElement('div');w.className='what';
       const s=document.createElement('strong');const sb=document.createElement('span');
-      if(it.k==='f'){const off=it.offered!=null?+it.offered:(+it.count||0)+(+it.refused||0);s.textContent=`Ate ${it.count} of ${off} ${it.insect.toLowerCase()}`;sb.textContent=[fmtTime(it.time),+it.refused?`refused ${it.refused}`:'all eaten',it.notes].filter(Boolean).join(' · ')}
+      if(it.k==='f'){const off=it.offered!=null?+it.offered:(+it.count||0)+(+it.refused||0);
+        if(it.pending){s.textContent=`${off} ${it.insect.toLowerCase()} in dish`;const c=document.createElement('span');c.className='chip wait';c.textContent='Waiting';s.appendChild(c);sb.textContent=[fmtTime(it.time),'tap Update when you check the dish',it.notes].filter(Boolean).join(' · ')}
+        else{s.textContent=`Ate ${it.count} of ${off} ${it.insect.toLowerCase()}`;sb.textContent=[fmtTime(it.time),+it.refused?`refused ${it.refused}`:'all eaten',it.notes].filter(Boolean).join(' · ')}}
       else{s.textContent=`${it.grams} g`;const c=document.createElement('span');c.className='chip';c.textContent='Weigh-in';s.appendChild(c)}
       w.append(s);if(sb.textContent)w.append(sb);
       const x=document.createElement('button');x.type='button';const key=it.k+it.id;
       x.className='x'+(pendingDel===key?' confirm':'');x.textContent=pendingDel===key?'Confirm':'Delete';
       x.setAttribute('aria-label',`Delete entry from ${fmt(it.date)}`);
-      x.onclick=()=>{if(pendingDel!==key){pendingDel=key;render();return}pendingDel=null;removeEntry(it.k==='f'?'feedings':'weights',it.id)};
-      li.append(d,w,x);hl.appendChild(li);
+      x.onclick=()=>{if(pendingDel!==key){pendingDel=key;render();return}pendingDel=null;if(editing&&editing.id===it.id)stopEdit();removeEntry(it.k==='f'?'feedings':'weights',it.id)};
+      const ed=document.createElement('button');ed.type='button';ed.className='x';ed.style.color='var(--accent)';
+      ed.textContent=it.k==='f'&&it.pending?'Update':'Edit';ed.setAttribute('aria-label',`Edit entry from ${fmt(it.date)}`);
+      ed.onclick=()=>startEdit(it);
+      const acts=document.createElement('div');acts.className='acts';acts.append(ed,x);
+      li.append(d,w,acts);hl.appendChild(li);
     });
     const dg=$('delGecko');const pd=pendingDel==='g'+g.id;dg.textContent=pd?`Confirm: remove ${g.name} and all entries`:'Remove this gecko';dg.className='x'+(pd?' confirm':'');
   }
@@ -589,6 +604,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
     persist();render();toast('Deleted');
   }
 
+  async function updateEntry(coll,id,data){const arr=coll==='feedings'?feedings:weights;const e=arr.find(x=>x.id===id);if(!e)return false;Object.assign(e,data);persist();render();return true}
   $('geckoForm').onsubmit=async e=>{e.preventDefault();
     const name=$('gName').value.trim();if(!name)return;
     const morph=$('gMorph').value.trim();
@@ -606,6 +622,8 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
   const ateVal=()=>Math.max(0,parseInt($('fCount').value,10)||0);
   let ateTouched=false;
   function updateRefused(){
+    const pend=$('fPending').checked;$('fCount').disabled=pend;
+    if(pend){$('fRefusedOut').textContent='—';$('fRefusedOut').classList.remove('warn');$('fHint').textContent='Saved as waiting. Tap Update in History once you check the dish.';$('fHint').style.color='';return}
     const o=offeredVal(),a=ateVal(),out=$('fRefusedOut'),bad=a>o;
     out.textContent=bad?'—':String(o-a);out.classList.toggle('warn',bad);
     $('fHint').textContent=bad?'Ate is higher than what you put in the dish. Check the numbers.':'Refused is worked out for you: put in dish minus ate.';
@@ -613,16 +631,46 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
   }
   $('fOffered').addEventListener('input',()=>{if(!ateTouched)$('fCount').value=$('fOffered').value;updateRefused()});
   $('fCount').addEventListener('input',()=>{ateTouched=true;updateRefused()});
+  $('fPending').addEventListener('change',updateRefused);
   $('feedForm').addEventListener('reset',()=>{ateTouched=false});
+  let editing=null;
+  function startEdit(it){
+    stopEdit(true);pendingDel=null;
+    if(it.k==='f'){
+      editing={k:'f',id:it.id};const off=it.offered!=null?+it.offered:(+it.count||0)+(+it.refused||0);
+      $('fDate').value=it.date;$('fTime').value=it.time||'';$('fInsect').value=it.insect;$('fOffered').value=off;
+      $('fCount').value=it.pending?off:it.count;$('fPending').checked=false;ateTouched=true;$('fNotes').value=it.notes||'';
+      $('feedTitle').textContent=it.pending?'Update meal':'Edit meal';$('feedSubmit').textContent='Save changes';$('feedCancel').hidden=false;
+      $('feedForm').classList.add('editing');updateRefused();$('feedForm').scrollIntoView({behavior:'smooth',block:'center'});
+      if(it.pending)setTimeout(()=>{$('fCount').focus();$('fCount').select()},300);
+    }else{
+      editing={k:'w',id:it.id};$('wDate').value=it.date;$('wGrams').value=it.grams;
+      $('wTitle').textContent='Edit weight';$('wSubmit').textContent='Save changes';$('wCancel').hidden=false;
+      $('weightForm').classList.add('editing');$('weightForm').scrollIntoView({behavior:'smooth',block:'center'});
+    }
+    render();
+  }
+  function stopEdit(silent){
+    if(!editing)return;const k=editing.k;editing=null;
+    if(k==='f'){$('feedTitle').textContent='Log a meal';$('feedSubmit').textContent='Save meal';$('feedCancel').hidden=true;$('feedForm').classList.remove('editing');
+      $('fDate').value=today;$('fTime').value=nowTime;$('fNotes').value='';$('fPending').checked=false;ateTouched=false;$('fCount').value=$('fOffered').value;updateRefused()}
+    else{$('wTitle').textContent='Log weight';$('wSubmit').textContent='Save weight';$('wCancel').hidden=true;$('weightForm').classList.remove('editing');$('wDate').value=today;$('wGrams').value=''}
+  }
+  $('feedCancel').onclick=()=>stopEdit();
+  $('wCancel').onclick=()=>stopEdit();
   updateRefused();
   $('feedForm').onsubmit=async e=>{e.preventDefault();if(!current)return;
-    const data={geckoId:current,date:$('fDate').value,time:$('fTime').value,insect:$('fInsect').value,
-      offered:offeredVal(),count:ateVal(),refused:Math.max(0,offeredVal()-ateVal()),notes:$('fNotes').value.trim(),createdAt:Date.now()};
-    if(data.count>data.offered){toast('Ate can’t be more than what you put in the dish');return}
-    if(await add('feedings',data)){$('fNotes').value='';ateTouched=false;$('fCount').value=$('fOffered').value;updateRefused();toast('Meal saved')}
+    const pend=$('fPending').checked;
+    const data={date:$('fDate').value,time:$('fTime').value,insect:$('fInsect').value,offered:offeredVal(),
+      count:pend?null:ateVal(),refused:pend?null:Math.max(0,offeredVal()-ateVal()),pending:pend,notes:$('fNotes').value.trim()};
+    if(!pend&&data.count>data.offered){toast('Ate can’t be more than what you put in the dish');return}
+    if(data.offered<1){toast('Enter how many you put in the dish');return}
+    if(editing&&editing.k==='f'){if(await updateEntry('feedings',editing.id,data)){stopEdit();toast('Meal updated');render()}return}
+    if(await add('feedings',{geckoId:current,...data,createdAt:Date.now()})){$('fPending').checked=false;$('fNotes').value='';ateTouched=false;$('fCount').value=$('fOffered').value;updateRefused();toast('Meal saved')}
   };
   $('weightForm').onsubmit=async e=>{e.preventDefault();if(!current)return;
     const grams=+parseFloat($('wGrams').value).toFixed(1);if(!(grams>0))return;
+    if(editing&&editing.k==='w'){if(await updateEntry('weights',editing.id,{date:$('wDate').value,grams})){stopEdit();toast('Weight updated');render()}return}
     if(await add('weights',{geckoId:current,date:$('wDate').value,grams,createdAt:Date.now()})){$('wGrams').value='';toast('Weight saved')}
   };
 
