@@ -140,6 +140,12 @@ label.check input{width:18px;height:18px;padding:0;accent-color:var(--accent)}
 .editing{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
 .acts{display:flex;gap:0;align-items:center}
 .chip.wait{background:var(--watch-soft);color:var(--watch)}
+.breed .status{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.chip.ovu{background:var(--watch-soft);color:var(--watch)}
+.chip.grav{background:var(--accent-soft);color:var(--accent)}
+details.tips summary{cursor:pointer;font-weight:600;font-size:14px}
+details.tips ul{margin:8px 0 0;padding-left:18px;display:grid;gap:6px;font-size:13.5px;color:var(--muted)}
+details.tips b{color:var(--fg)}
 .calc.warn{color:var(--bad);border-color:var(--bad)}
 
 label{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500;min-width:0}
@@ -217,9 +223,15 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
     </datalist>
     <p class="note" style="margin:0">Choose from the list or type any morph or combo, e.g. "Mack Snow Tremper".</p>
     <div class="row">
-      <label>Hatch date<input type="date" id="gHatch"></label>
+      <label id="hatchLabel">Hatch date<input type="date" id="gHatch"></label>
       <label>Date purchased<input type="date" id="gBought"></label>
     </div>
+    <label class="check"><input type="checkbox" id="gApprox"> I don’t know the exact hatch date</label>
+    <div class="row" id="approxRow" hidden>
+      <label>Approximate age<span class="seg" style="flex-wrap:nowrap"><input type="number" id="gAgeNum" min="0" max="30" step="0.5" inputmode="decimal" placeholder="e.g. 6"><select id="gAgeUnit" style="width:auto"><option value="m">months</option><option value="y">years</option></select></span></label>
+      <label>Age as of<select id="gAgeAt"><option value="purchase">Date purchased</option><option value="today">Today</option></select></label>
+    </div>
+    <p class="note" id="approxHint" style="margin:0" hidden>The shop or breeder can usually give a rough age. The app turns it into an estimated hatch date, so the age keeps updating.</p>
     <div class="row">
       <label>Sex<select id="gSex"><option value="">Unknown</option><option>Female</option><option>Male</option></select></label>
       <label>Breeder or shop<input id="gSource" maxlength="60" placeholder="e.g. breeder name"></label>
@@ -230,7 +242,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
       <label>Mother's morph (dam)<input id="gDam" list="morphs" maxlength="80" placeholder="Pick or type" autocomplete="off"></label>
     </div>
     <label>Hets / genetics notes<input id="gGenes" maxlength="120" placeholder="e.g. 66% het Tremper, possible Eclipse"></label>
-    <p class="note" style="margin:0">Only the name is required. Adding the hatch date makes the health check age-aware.</p>
+    <p class="note" style="margin:0">Only the name is required. Adding a hatch date or approximate age makes the health check age-aware.</p>
     <div class="seg"><button class="btn" type="submit" id="gSubmit">Save gecko</button><button class="btn ghost" type="button" id="gCancel">Cancel</button></div>
   </form>
 
@@ -263,6 +275,32 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
       <ul class="checks" id="checks"></ul>
       <p class="note" style="margin:0" id="hBasis"></p>
       <p class="note" style="margin:0">These are general guidelines from your logs, not a diagnosis. If something worries you, a reptile vet is the right call.</p>
+    </section>
+
+    <section class="panel breed" id="breedPanel" hidden aria-label="Breeding season">
+      <div class="hhead"><h2>Breeding season</h2><label class="check"><input type="checkbox" id="bSeason"> Weekly check-ins</label></div>
+      <div class="status"><span class="pill none" id="bPill">No check-ins yet</span><span class="note" id="bSub"></span></div>
+      <form id="breedForm">
+        <h2 id="bTitle" style="font-size:16px">Log a check-in</h2>
+        <div class="row">
+          <label>Date<input type="date" id="bDate" required></label>
+          <label>What you saw<select id="bStatus">
+            <option value="clear">Nothing visible</option>
+            <option value="follicles">Follicles (ovulating)</option>
+            <option value="gravid">Eggs visible (gravid)</option>
+            <option value="laid">Laid eggs</option>
+          </select></label>
+        </div>
+        <label id="bEggsLabel" hidden>Eggs laid<input type="number" id="bEggs" min="0" max="4" step="1" value="2" inputmode="numeric"></label>
+        <label>Notes (optional)<input id="bNotes" maxlength="120" placeholder="e.g. Pinkish spots near back legs, digging in lay box"></label>
+        <div class="seg"><button class="btn" type="submit" id="bSubmit">Save check-in</button><button class="btn ghost" type="button" id="bCancel" hidden>Cancel</button></div>
+      </form>
+      <details class="tips"><summary>How to check</summary><ul>
+        <li>Hold her gently in your palm, or let her walk on clear plastic, and look at her belly under a bright light.</li>
+        <li><b>Follicles (ovulating):</b> pinkish or orange round spots low on the belly, near the back legs.</li>
+        <li><b>Gravid:</b> two white, oval eggs showing through the belly. Keep handling to a minimum.</li>
+        <li>Females can ovulate and lay infertile eggs without a male, so keep a moist lay box in the tank all season.</li>
+      </ul></details>
     </section>
 
     <section class="stats" aria-label="Summary">
@@ -333,7 +371,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
   const fmtTime=t=>{if(!t)return'';const [h,m]=t.split(':').map(Number);return `${((h+11)%12)+1}:${pad(m)} ${h<12?'AM':'PM'}`};
   const ago=d=>d===0?'Today':d===1?'1 day ago':`${d} days ago`;
 
-  let geckos=[], feedings=[], weights=[], current=null, view='home', sample=false, pendingDel=null, editingId=null;
+  let geckos=[], feedings=[], weights=[], breeding=[], current=null, view='home', sample=false, pendingDel=null, editingId=null;
   const localPhotos={};
   const photoSrc=g=>g.photo&&localPhotos[g.photo]||'';
 
@@ -348,6 +386,14 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
   const monthsOld=s=>(toDate(today)-toDate(s))/dayMs/30.44;
   const mealsOf=id=>feedings.filter(f=>f.geckoId===id).sort((a,b)=>(b.date+(b.time||'')).localeCompare(a.date+(a.time||'')));
   const weightsOf=id=>weights.filter(w=>w.geckoId===id).sort((a,b)=>a.date.localeCompare(b.date));
+  const checksOf=id=>breeding.filter(b=>b.geckoId===id).sort((a,b)=>b.date.localeCompare(a.date)||(b.createdAt||0)-(a.createdAt||0));
+  const BLABEL={clear:'Nothing visible',follicles:'Ovulating',gravid:'Gravid',laid:'Laid eggs'};
+  function breedState(g){
+    const B=checksOf(g.id);if(!B.length)return {B,latest:null,since:null,gravidDays:null,clutches:[]};
+    const latest=B[0],since=daysAgo(latest.date);let from=null;
+    if(latest.status==='gravid'){for(const b of B){if(b.status==='gravid')from=b.date;else break}}
+    return {B,latest,since,gravidDays:from?daysAgo(from):null,clutches:B.filter(b=>b.status==='laid'&&daysAgo(b.date)<240)};
+  }
 
   /* ---------- Health check ---------- */
   const RANK={none:0,good:1,watch:2,bad:3};
@@ -357,7 +403,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
     // life stage
     let stage,basis;
     const lastW=W.length?W[W.length-1]:null;
-    if(g.hatchDate){const m=monthsOld(g.hatchDate);stage=m<4?'baby':m<12?'juvenile':'adult';basis=`Age-aware: treated as ${stage} (${span(g.hatchDate)} old).`}
+    if(g.hatchDate){const m=monthsOld(g.hatchDate);stage=m<4?'baby':m<11.9?'juvenile':'adult';basis=`Age-aware: treated as ${stage} (${g.hatchEstimated?'about ':''}${span(g.hatchDate)} old${g.hatchEstimated?', estimated':''}).`}
     else if(lastW){stage=lastW.grams<15?'baby':lastW.grams<40?'juvenile':'adult';basis=`Treated as ${stage} based on weight. Add a hatch date for age-aware checks.`}
     else{stage='adult';basis='Treated as adult. Add a hatch date or a weigh-in for more accurate checks.'}
     const maxGap={baby:2,juvenile:3,adult:5}[stage];
@@ -379,6 +425,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
         let st,s;
         if(stage==='adult'){st=pct>=-5?'good':pct>=-10?'watch':'bad';s=st==='good'?'Adults should hold steady. This is within normal range.':st==='watch'?'A drop of 5–10% is worth watching. Check for stuck shed, temperature or stress.':'A drop over 10% is significant. Consider a reptile vet visit if it continues.'}
         else{st=pct>2?'good':pct>=-5?'watch':'bad';s=st==='good'?`Growing as a ${stage} should.`:st==='watch'?`${stage==='baby'?'Babies':'Juveniles'} should be gaining. Flat weight is worth watching.`:`A young gecko losing weight is a concern. Consider a reptile vet visit.`}
+        if(st!=='good'&&g.sex==='Female'&&breeding.some(b=>b.geckoId===g.id&&b.status==='laid'&&b.date>=ref.date&&b.date<=latest.date)){st='watch';s='Some weight loss after laying eggs is normal. She should regain it over the next few weeks.'}
         checks.push({k:'weight',st,t:`Weight ${p>0?'+':''}${p}% since ${fmt(ref.date)}`,s});
       }else checks.push({k:'weight',st:'none',t:'Weight trend',s:'Weigh-ins need to be at least a week apart to show a trend.'});
       const sinceW=daysAgo(latest.date);
@@ -399,6 +446,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
         if(drop>0.5){st='bad';parts.push(`Eating about ${Math.round(drop*100)}% less per meal than before.`)}
         else if(drop>0.3){if(st==='good')st='watch';parts.push(`Eating about ${Math.round(drop*100)}% less per meal than before.`)}
       }
+      if(st!=='good'&&g.sex==='Female'&&breeding.some(b=>b.geckoId===g.id&&(b.status==='follicles'||b.status==='gravid')&&daysAgo(b.date)<30)){st='watch';parts.push('Females often eat less while ovulating or gravid.')}
       checks.push({k:'appetite',st,t:st==='good'?'Appetite steady':'Appetite dropping',s:parts.length?parts.join(' ')+' A short dip before or during shed is normal.':`Averaging ${(e/recent.length).toFixed(1)} insects per meal.`});
     }else checks.push({k:'appetite',st:'none',t:'Appetite',s:'Log a few meals over 2 weeks to compare appetite.'});
 
@@ -412,6 +460,18 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
       else checks.push({k:'variety',st:'good',t:`${kinds.size} feeder types this month`,s:'Good variety.'});
     }
 
+    // 5. breeding season (females)
+    if(g.sex==='Female'){
+      const bs=breedState(g);
+      if(g.breedingSeason&&(!bs.latest||bs.since>=7))checks.push({k:'bcheck',st:'watch',t:bs.latest?`Breeding check due (last ${ago(bs.since).toLowerCase()})`:'Breeding check due',s:'During the season, check her belly once a week for follicles or eggs.'});
+      if(bs.latest&&bs.since<=45){const L=bs.latest;
+        if(L.status==='follicles')checks.push({k:'breed',st:'good',t:`Ovulating (seen ${fmt(L.date)})`,s:'Normal in season, even without a male. Dust every meal with calcium, keep a moist lay box in, and expect her to eat a bit less.'});
+        else if(L.status==='gravid'){const d=bs.gravidDays,st=d>30?'bad':d>21?'watch':'good';
+          checks.push({k:'breed',st,t:`Gravid for ${d} day${d===1?'':'s'}`,s:st==='good'?'Keep the lay box moist and her calcium up. Most females lay within a few weeks of the eggs showing.':st==='watch'?'She has carried eggs for over 3 weeks. Make sure she can reach a moist lay box and watch for digging.':'Carrying eggs this long can mean egg binding. Contact a reptile vet, especially if she is weak, straining or not eating.'});}
+        else if(L.status==='laid'){const n=bs.clutches.length;
+          checks.push({k:'breed',st:n>=5?'watch':'good',t:`Laid ${L.eggs!=null?L.eggs+' egg'+(+L.eggs===1?'':'s'):'eggs'} on ${fmt(L.date)}`,s:(n>=5?`That is ${n} clutches this season, which takes a lot out of her. Watch her weight and tail. `:'')+'Another clutch often follows in about 2–4 weeks. Feed generously and keep calcium up so she recovers.'});}
+      }
+    }
     const waiting=F.filter(f=>f.pending&&daysAgo(f.date)>=1);
     if(waiting.length)checks.push({k:'pending',st:'watch',t:`${waiting.length} meal${waiting.length>1?'s':''} waiting for an update`,s:`Insects put in the dish on ${fmt(waiting[waiting.length-1].date)} still need "Ate" filled in. Tap Update in History.`});
     const scored=checks.filter(c=>c.st!=='none');
@@ -465,7 +525,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
       const top=document.createElement('div');top.className='top';
       const nm=document.createElement('div');nm.className='nm';
       const b=document.createElement('b');b.textContent=g.name;
-      const s=document.createElement('span');s.textContent=[g.morph||'Morph not set',g.hatchDate&&span(g.hatchDate)?span(g.hatchDate)+' old':''].filter(Boolean).join(' · ');
+      const s=document.createElement('span');s.textContent=[g.morph||'Morph not set',g.hatchDate&&span(g.hatchDate)?(g.hatchEstimated?'~':'')+span(g.hatchDate)+' old':''].filter(Boolean).join(' · ');
       nm.append(b,s);top.append(avatar(g,'sm'),nm);
       const F=mealsOf(g.id),W=weightsOf(g.id);
       const meta=document.createElement('div');meta.className='meta';
@@ -474,6 +534,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
       meta.append(m1,m2);
       const iss=document.createElement('div');iss.className='issue';
       const p=document.createElement('span');p.className='pill '+h.overall;p.textContent=LABEL[h.overall];iss.appendChild(p);
+      if(g.sex==='Female'){const bs=breedState(g);if(bs.latest&&bs.latest.status!=='clear'&&bs.since<=45){const c=document.createElement('span');c.className='chip '+(bs.latest.status==='gravid'?'grav':'ovu');c.style.marginLeft='0';c.textContent=bs.latest.status==='laid'?`Laid ${fmt(bs.latest.date)}`:BLABEL[bs.latest.status];iss.appendChild(c)}}
       if(h.top){const t=document.createElement('span');t.textContent=h.top.t;iss.appendChild(t)}
       c.append(top,meta,iss);grid.appendChild(c);
     });
@@ -494,7 +555,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
     rm.textContent=pendingDel==='p'+g.id?'Confirm remove':'Remove photo';rm.className='x'+(pendingDel==='p'+g.id?' confirm':'');
     $('pMorph').textContent=g.morph||'Morph not set';
     const facts=[
-      ['Hatched',g.hatchDate?fullDate(g.hatchDate):'',g.hatchDate&&span(g.hatchDate)?`${span(g.hatchDate)} old`:''],
+      [g.hatchEstimated?'Hatched (estimated)':'Hatched',g.hatchDate?(g.hatchEstimated?'Around '+toDate(g.hatchDate).toLocaleDateString(undefined,{year:'numeric',month:'short'}):fullDate(g.hatchDate)):'',g.hatchDate&&span(g.hatchDate)?`${g.hatchEstimated?'About ':''}${span(g.hatchDate)} old`:''],
       ['Purchased',g.purchaseDate?fullDate(g.purchaseDate):'',g.purchaseDate&&span(g.purchaseDate)?`With you ${span(g.purchaseDate)}`:''],
       ['Sex',g.sex||'',''],['Breeder or shop',g.source||'',''],
       ["Father's morph (sire)",g.sire||'',''],["Mother's morph (dam)",g.dam||'',''],
@@ -513,6 +574,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
       const b=document.createElement('b');b.textContent=c.t;const s=document.createElement('span');s.textContent=c.s;tx.append(b,s);
       li.append(bar,tx);ul.appendChild(li)});
     $('hBasis').textContent=h.basis;
+    renderBreed(g);
 
     // stats
     if(F.length){$('sLast').textContent=ago(daysAgo(F[0].date));$('sLastSub').textContent=F[0].pending?`${F[0].offered} ${F[0].insect.toLowerCase()} in dish · ${fmt(F[0].date)}`:`${F[0].count} ${F[0].insect.toLowerCase()} · ${fmt(F[0].date)}`}
@@ -529,7 +591,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
     drawChart(W);
 
     // history
-    const items=[...F.map(f=>({k:'f',...f,sortKey:f.date+(f.time||'')})),...W.map(w=>({k:'w',...w,sortKey:w.date+'99'}))].sort((a,b)=>b.sortKey.localeCompare(a.sortKey));
+    const items=[...F.map(f=>({k:'f',...f,sortKey:f.date+(f.time||'')})),...W.map(w=>({k:'w',...w,sortKey:w.date+'99'})),...checksOf(g.id).map(b=>({k:'b',...b,sortKey:b.date+'98'}))].sort((a,b)=>b.sortKey.localeCompare(a.sortKey));
     const hl=$('history');hl.textContent='';
     if(!items.length){const li=document.createElement('li');li.style.gridTemplateColumns='1fr';li.innerHTML='<span class="note">Meals and weigh-ins you log will show here.</span>';hl.appendChild(li)}
     items.slice(0,60).forEach(it=>{
@@ -540,12 +602,13 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
       if(it.k==='f'){const off=it.offered!=null?+it.offered:(+it.count||0)+(+it.refused||0);
         if(it.pending){s.textContent=`${off} ${it.insect.toLowerCase()} in dish`;const c=document.createElement('span');c.className='chip wait';c.textContent='Waiting';s.appendChild(c);sb.textContent=[fmtTime(it.time),'tap Update when you check the dish',it.notes].filter(Boolean).join(' · ')}
         else{s.textContent=`Ate ${it.count} of ${off} ${it.insect.toLowerCase()}`;sb.textContent=[fmtTime(it.time),+it.refused?`refused ${it.refused}`:'all eaten',it.notes].filter(Boolean).join(' · ')}}
+      else if(it.k==='b'){s.textContent={clear:'Nothing visible',follicles:'Follicles seen (ovulating)',gravid:'Eggs visible (gravid)',laid:it.eggs!=null?`Laid ${it.eggs} egg${+it.eggs===1?'':'s'}`:'Laid eggs'}[it.status]||'Breeding check';const c=document.createElement('span');c.className='chip';c.textContent='Breeding check';s.appendChild(c);sb.textContent=it.notes||''}
       else{s.textContent=`${it.grams} g`;const c=document.createElement('span');c.className='chip';c.textContent='Weigh-in';s.appendChild(c)}
       w.append(s);if(sb.textContent)w.append(sb);
       const x=document.createElement('button');x.type='button';const key=it.k+it.id;
       x.className='x'+(pendingDel===key?' confirm':'');x.textContent=pendingDel===key?'Confirm':'Delete';
       x.setAttribute('aria-label',`Delete entry from ${fmt(it.date)}`);
-      x.onclick=()=>{if(pendingDel!==key){pendingDel=key;render();return}pendingDel=null;if(editing&&editing.id===it.id)stopEdit();removeEntry(it.k==='f'?'feedings':'weights',it.id)};
+      x.onclick=()=>{if(pendingDel!==key){pendingDel=key;render();return}pendingDel=null;if(editing&&editing.id===it.id)stopEdit();removeEntry({f:'feedings',w:'weights',b:'breeding'}[it.k],it.id)};
       const ed=document.createElement('button');ed.type='button';ed.className='x';ed.style.color='var(--accent)';
       ed.textContent=it.k==='f'&&it.pending?'Update':'Edit';ed.setAttribute('aria-label',`Edit entry from ${fmt(it.date)}`);
       ed.onclick=()=>startEdit(it);
@@ -553,6 +616,18 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
       li.append(d,w,acts);hl.appendChild(li);
     });
     const dg=$('delGecko');const pd=pendingDel==='g'+g.id;dg.textContent=pd?`Confirm: remove ${g.name} and all entries`:'Remove this gecko';dg.className='x'+(pd?' confirm':'');
+  }
+
+  function renderBreed(g){
+    const on=g.sex==='Female';$('breedPanel').hidden=!on;if(!on)return;
+    $('bSeason').checked=!!g.breedingSeason;
+    const bs=breedState(g),p=$('bPill'),sub=$('bSub');
+    if(!bs.latest){p.className='pill none';p.textContent='No check-ins yet';sub.textContent=g.breedingSeason?'Check her belly once a week while the season runs.':'Turn on weekly check-ins when the breeding season starts.'}
+    else{const L=bs.latest;
+      p.className='pill '+({clear:'good',follicles:'watch',gravid:bs.gravidDays>30?'bad':'watch',laid:'good'}[L.status]||'none');
+      p.textContent=L.status==='gravid'?`Gravid · ${bs.gravidDays} day${bs.gravidDays===1?'':'s'}`:BLABEL[L.status];
+      const next=g.breedingSeason?(bs.since>=7?' · Check-in due':` · Next check in ${7-bs.since} day${7-bs.since===1?'':'s'}`):'';
+      sub.textContent=`Last check ${ago(bs.since).toLowerCase()}${bs.clutches.length?` · ${bs.clutches.length} clutch${bs.clutches.length>1?'es':''} this season`:''}${next}`}
   }
 
   function drawChart(W){
@@ -578,9 +653,14 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
   /* ---------- Forms & actions ---------- */
   const PF={gHatch:'hatchDate',gBought:'purchaseDate',gSex:'sex',gSource:'source',gSire:'sire',gDam:'dam',gGenes:'genes'};
   let formReturn='home';
-  function openAddForm(){editingId=null;formReturn='home';$('geckoForm').reset();$('gTitle').textContent='Add a gecko';$('gSubmit').textContent='Save gecko';show('form');$('gName').focus()}
+  const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  function syncApprox(){const on=$('gApprox').checked;$('approxRow').hidden=!on;$('approxHint').hidden=!on;$('hatchLabel').hidden=on;
+    if(on&&!$('gBought').value)$('gAgeAt').value='today'}
+  $('gApprox').addEventListener('change',syncApprox);
+  function openAddForm(){editingId=null;formReturn='home';$('geckoForm').reset();syncApprox();$('gTitle').textContent='Add a gecko';$('gSubmit').textContent='Save gecko';show('form');$('gName').focus()}
   function openEditForm(){const g=geckos.find(x=>x.id===current);if(!g)return;editingId=g.id;formReturn='gecko';
     $('gName').value=g.name||'';$('gMorph').value=g.morph||'';for(const [el,k] of Object.entries(PF))$(el).value=g[k]||'';
+    $('gApprox').checked=!!g.hatchEstimated;const ap=g.approxAge||{};$('gAgeNum').value=ap.n!=null?ap.n:'';$('gAgeUnit').value=ap.unit||'m';$('gAgeAt').value=ap.at||'purchase';syncApprox();
     $('gTitle').textContent=`Edit ${g.name}`;$('gSubmit').textContent='Save changes';show('form')}
   $('emptyAdd').onclick=openAddForm;
   $('editGecko').onclick=openEditForm;
@@ -589,7 +669,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
 
   /* ---------- Storage (this device) ---------- */
   const KEY='geckoLog.v1';let canStore=true;
-  function persist(){try{localStorage.setItem(KEY,JSON.stringify({geckos,feedings,weights}))}catch(e){canStore=false;$('sampleBanner').hidden=false}}
+  function persist(){try{localStorage.setItem(KEY,JSON.stringify({geckos,feedings,weights,breeding}))}catch(e){canStore=false;$('sampleBanner').hidden=false}}
   const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
   let idb=null;
   function openIdb(){return new Promise(res=>{try{const r=indexedDB.open('geckoLogPhotos',1);r.onupgradeneeded=()=>r.result.createObjectStore('photos');r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)}catch(e){res(null)}})}
@@ -598,17 +678,26 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
   const delPhoto=id=>idbDo('readwrite',st=>st.delete(id)).catch(()=>{});
   const getPhoto=id=>idbDo('readonly',st=>st.get(id));
 
-  async function add(coll,data){const id=uid();({geckos,feedings,weights})[coll].push({id,...data});persist();render();return id}
+  async function add(coll,data){const id=uid();({geckos,feedings,weights,breeding})[coll].push({id,...data});persist();render();return id}
   async function removeEntry(coll,id){
-    if(coll==='feedings')feedings=feedings.filter(x=>x.id!==id);else weights=weights.filter(x=>x.id!==id);
+    if(coll==='feedings')feedings=feedings.filter(x=>x.id!==id);else if(coll==='breeding')breeding=breeding.filter(x=>x.id!==id);else weights=weights.filter(x=>x.id!==id);
     persist();render();toast('Deleted');
   }
 
-  async function updateEntry(coll,id,data){const arr=coll==='feedings'?feedings:weights;const e=arr.find(x=>x.id===id);if(!e)return false;Object.assign(e,data);persist();render();return true}
+  async function updateEntry(coll,id,data){const arr=coll==='feedings'?feedings:coll==='breeding'?breeding:weights;const e=arr.find(x=>x.id===id);if(!e)return false;Object.assign(e,data);persist();render();return true}
+  async function saveGecko(id,data){const g=geckos.find(x=>x.id===id);if(!g)return false;Object.assign(g,data);persist();render();return true}
   $('geckoForm').onsubmit=async e=>{e.preventDefault();
     const name=$('gName').value.trim();if(!name)return;
     const morph=$('gMorph').value.trim();
     const prof={};for(const [el,k] of Object.entries(PF))prof[k]=$(el).value.trim();
+    if(prof.purchaseDate&&prof.purchaseDate>today){toast('Purchase date can’t be in the future');return}
+    if($('gApprox').checked){
+      const n=parseFloat($('gAgeNum').value),unit=$('gAgeUnit').value,at=$('gAgeAt').value;
+      if(!(n>=0)){toast('Enter the approximate age');return}
+      if(at==='purchase'&&!prof.purchaseDate){toast('Add the purchase date, or set “Age as of” to Today');return}
+      const d=toDate(at==='purchase'?prof.purchaseDate:today);d.setMonth(d.getMonth()-Math.round(unit==='y'?n*12:n));
+      prof.hatchDate=iso(d);prof.hatchEstimated=true;prof.approxAge={n,unit,at};
+    }else{prof.hatchEstimated=false;prof.approxAge=null}
     if(prof.hatchDate&&prof.hatchDate>today){toast('Hatch date can’t be in the future');return}
     if(prof.purchaseDate&&prof.purchaseDate>today){toast('Purchase date can’t be in the future');return}
     if(prof.hatchDate&&prof.purchaseDate&&prof.purchaseDate<prof.hatchDate){toast('Purchase date is before the hatch date');return}
@@ -643,6 +732,10 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
       $('feedTitle').textContent=it.pending?'Update meal':'Edit meal';$('feedSubmit').textContent='Save changes';$('feedCancel').hidden=false;
       $('feedForm').classList.add('editing');updateRefused();$('feedForm').scrollIntoView({behavior:'smooth',block:'center'});
       if(it.pending)setTimeout(()=>{$('fCount').focus();$('fCount').select()},300);
+    }else if(it.k==='b'){
+      editing={k:'b',id:it.id};$('bDate').value=it.date;$('bStatus').value=it.status;$('bEggs').value=it.eggs!=null?it.eggs:2;$('bNotes').value=it.notes||'';syncEggs();
+      $('bTitle').textContent='Edit check-in';$('bSubmit').textContent='Save changes';$('bCancel').hidden=false;
+      $('breedForm').classList.add('editing');$('breedPanel').scrollIntoView({behavior:'smooth',block:'center'});
     }else{
       editing={k:'w',id:it.id};$('wDate').value=it.date;$('wGrams').value=it.grams;
       $('wTitle').textContent='Edit weight';$('wSubmit').textContent='Save changes';$('wCancel').hidden=false;
@@ -654,6 +747,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
     if(!editing)return;const k=editing.k;editing=null;
     if(k==='f'){$('feedTitle').textContent='Log a meal';$('feedSubmit').textContent='Save meal';$('feedCancel').hidden=true;$('feedForm').classList.remove('editing');
       $('fDate').value=today;$('fTime').value=nowTime;$('fNotes').value='';$('fPending').checked=false;ateTouched=false;$('fCount').value=$('fOffered').value;updateRefused()}
+    else if(k==='b'){resetBreedForm()}
     else{$('wTitle').textContent='Log weight';$('wSubmit').textContent='Save weight';$('wCancel').hidden=true;$('weightForm').classList.remove('editing');$('wDate').value=today;$('wGrams').value=''}
   }
   $('feedCancel').onclick=()=>stopEdit();
@@ -668,6 +762,20 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
     if(editing&&editing.k==='f'){if(await updateEntry('feedings',editing.id,data)){stopEdit();toast('Meal updated');render()}return}
     if(await add('feedings',{geckoId:current,...data,createdAt:Date.now()})){$('fPending').checked=false;$('fNotes').value='';ateTouched=false;$('fCount').value=$('fOffered').value;updateRefused();toast('Meal saved')}
   };
+  function syncEggs(){$('bEggsLabel').hidden=$('bStatus').value!=='laid'}
+  function resetBreedForm(){$('bTitle').textContent='Log a check-in';$('bSubmit').textContent='Save check-in';$('bCancel').hidden=true;$('breedForm').classList.remove('editing');$('bDate').value=today;$('bStatus').value='clear';$('bNotes').value='';syncEggs()}
+  $('bStatus').addEventListener('change',syncEggs);
+  $('bCancel').onclick=()=>stopEdit();
+  $('breedForm').onsubmit=async e=>{e.preventDefault();if(!current)return;
+    const status=$('bStatus').value,date=$('bDate').value;
+    if(!date){toast('Pick the date of the check');return}
+    if(date>today){toast('The date can’t be in the future');return}
+    const data={date,status,eggs:status==='laid'?Math.max(0,parseInt($('bEggs').value,10)||0):null,notes:$('bNotes').value.trim()};
+    if(editing&&editing.k==='b'){if(await updateEntry('breeding',editing.id,data)){stopEdit();toast('Check-in updated');render()}return}
+    if(await add('breeding',{geckoId:current,...data,createdAt:Date.now()})){$('bNotes').value='';toast('Check-in saved')}
+  };
+  $('bSeason').addEventListener('change',async e=>{const g=geckos.find(x=>x.id===current);if(!g)return;const on=e.target.checked;
+    if(await saveGecko(g.id,{breedingSeason:on}))toast(on?'Weekly check-ins on':'Weekly check-ins off');else e.target.checked=!on});
   $('weightForm').onsubmit=async e=>{e.preventDefault();if(!current)return;
     const grams=+parseFloat($('wGrams').value).toFixed(1);if(!(grams>0))return;
     if(editing&&editing.k==='w'){if(await updateEntry('weights',editing.id,{date:$('wDate').value,grams})){stopEdit();toast('Weight updated');render()}return}
@@ -705,7 +813,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
     const id=current;
     if(pendingDel!=='g'+id){pendingDel='g'+id;render();return}
     pendingDel=null;const g=geckos.find(x=>x.id===id);if(g&&g.photo)delPhoto(g.photo);
-    feedings=feedings.filter(f=>f.geckoId!==id);weights=weights.filter(w=>w.geckoId!==id);geckos=geckos.filter(x=>x.id!==id);
+    feedings=feedings.filter(f=>f.geckoId!==id);weights=weights.filter(w=>w.geckoId!==id);breeding=breeding.filter(b=>b.geckoId!==id);geckos=geckos.filter(x=>x.id!==id);
     persist();toast('Gecko removed');show('home');
   };
 
@@ -714,7 +822,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
   $('exportBtn').onclick=async()=>{
     const photos={};
     for(const g of geckos){if(g.photo){try{const b=await getPhoto(g.photo);if(b)photos[g.photo]=await blobToData(b)}catch(e){}}}
-    const data={app:'amatsu-nikki',version:1,exportedAt:new Date().toISOString(),geckos,feedings,weights,photos};
+    const data={app:'amatsu-nikki',version:1,exportedAt:new Date().toISOString(),geckos,feedings,weights,breeding,photos};
     const url=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));
     const a=document.createElement('a');a.href=url;a.download=`amatsu-nikki-backup-${today}.json`;document.body.appendChild(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),2000);
@@ -727,7 +835,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
     try{const d=JSON.parse(await file.text());
       if(!['amatsu-nikki','gecko-feeding-log'].includes(d.app)||!Array.isArray(d.geckos))throw 0;
       pendingImport=d;
-      $('importMsg').textContent=`This backup has ${d.geckos.length} gecko${d.geckos.length===1?'':'s'}, ${(d.feedings||[]).length} meals and ${(d.weights||[]).length} weigh-ins. Restoring replaces everything currently on this device.`;
+      $('importMsg').textContent=`This backup has ${d.geckos.length} gecko${d.geckos.length===1?'':'s'}, ${(d.feedings||[]).length} meals and ${(d.weights||[]).length} weigh-ins and ${(d.breeding||[]).length} breeding check-ins. Restoring replaces everything currently on this device.`;
       $('importConfirm').hidden=false;
     }catch(err){toast('That file isn’t an Amatsu Nikki backup')}
   };
@@ -735,7 +843,7 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
   $('importYes').onclick=async()=>{
     const d=pendingImport;if(!d)return;pendingImport=null;$('importConfirm').hidden=true;
     for(const g of geckos)if(g.photo)delPhoto(g.photo);
-    geckos=d.geckos;feedings=d.feedings||[];weights=d.weights||[];
+    geckos=d.geckos;feedings=d.feedings||[];weights=d.weights||[];breeding=d.breeding||[];
     for(const k in localPhotos){URL.revokeObjectURL(localPhotos[k]);delete localPhotos[k]}
     for(const [pid,dataUrl] of Object.entries(d.photos||{})){
       try{const b=await (await fetch(dataUrl)).blob();await putPhoto(pid,b);localPhotos[pid]=URL.createObjectURL(b)}catch(e){}
@@ -748,9 +856,9 @@ input,select{font:500 15px var(--body);color:var(--fg);background:var(--bg);bord
   }
 
   /* ---------- Start ---------- */
-  $('fDate').value=today;$('fTime').value=nowTime;$('wDate').value=today;
+  $('fDate').value=today;$('fTime').value=nowTime;$('wDate').value=today;$('bDate').value=today;syncEggs();
   let started=false;
-  try{const raw=localStorage.getItem(KEY);if(raw){const d=JSON.parse(raw);geckos=d.geckos||[];feedings=d.feedings||[];weights=d.weights||[]}}
+  try{const raw=localStorage.getItem(KEY);if(raw){const d=JSON.parse(raw);geckos=d.geckos||[];feedings=d.feedings||[];weights=d.weights||[];breeding=d.breeding||[]}}
   catch(e){canStore=false;$('sampleBanner').hidden=false}
   started=true;updateBackupNote();render();
   openIdb().then(async d=>{idb=d;

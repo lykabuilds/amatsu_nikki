@@ -16,6 +16,8 @@ Amatsu Nikki is a care tracker for leopard geckos, named after my first gecko, A
   - Weight change over ~30 days
   - Appetite (refusal rate and drop vs. earlier weeks)
   - Feeder variety and fatty-treat share
+  - Breeding status for females (gravid too long, many clutches), and softer flags for normal weight loss after laying or appetite dips while ovulating
+- **Breeding season check-ins** for female geckos: weekly reminders in the app, log what you see (nothing, follicles, eggs visible, laid eggs and how many), with a gravid-day counter and clutch count.
 - **Backup & restore** to a JSON file (photos included).
 - **Installable** (Add to Home Screen) and works offline.
 
@@ -33,11 +35,11 @@ python3 -m http.server 8000
 
 ## Deploy on GitHub Pages
 
-1. Create a new repository on GitHub, e.g. `amatsu-nikki`.
+1. Create a new repository on GitHub, e.g. `amatsu_nikki`. The repository name becomes part of the web address, so spell it the same in both places.
 2. Upload all files in this folder (`index.html`, `manifest.webmanifest`, `icon.svg`, `sw.js`, `README.md`) to the repository root.
 3. Go to **Settings → Pages**.
 4. Under **Build and deployment**, set **Source** to *Deploy from a branch*, choose `main` and `/ (root)`, then **Save**.
-5. After a minute or two, the app is live at `https://<your-username>.github.io/amatsu-nikki/`.
+5. After a minute or two, the app is live at `https://<your-username>.github.io/<repository-name>/`, for example `https://lykabuilds.github.io/amatsu_nikki/` (underscore, not a hyphen).
 
 ## How data is stored
 

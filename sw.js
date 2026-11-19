@@ -1,5 +1,5 @@
 // Offline support: caches the app shell so it opens without internet.
-const CACHE = 'amatsu-nikki-v1';
+const CACHE = 'amatsu-nikki-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', e => {
